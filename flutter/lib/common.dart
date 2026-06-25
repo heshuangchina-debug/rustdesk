@@ -1582,7 +1582,10 @@ String translate(String name) {
 // sciter: Does not have the function, but it should be kept the same.
 bool option2bool(String option, String value) {
   bool res;
-  if (option.startsWith("enable-")) {
+  // Special case: enable-check-update defaults to false (disabled by default)
+  if (option == kOptionEnableCheckUpdate) {
+    return value == "Y";
+  } else if (option.startsWith("enable-")) {
     res = value != "N";
   } else if (option.startsWith("allow-") ||
       option == kOptionStopService ||
@@ -3697,7 +3700,7 @@ Widget loadPowered(BuildContext context) {
     cursor: SystemMouseCursors.click,
     child: GestureDetector(
       onTap: () {
-        launchUrl(Uri.parse('https://rustdesk.com'));
+        launchUrl(Uri.parse('https://www.szyhlo.com'));
       },
       child: Opacity(
           opacity: 0.5,

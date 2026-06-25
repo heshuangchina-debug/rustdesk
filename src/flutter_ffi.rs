@@ -44,6 +44,11 @@ fn initialize(app_dir: &str, custom_client_config: &str) {
     {
         *config::APP_DIR.write().unwrap() = app_dir.to_owned();
     }
+    // Hardcoded server configuration for internal use
+    // Server address: 192.168.0.28
+    // Key: vcUVyDqvO2JU5RkPZIIBMr9LgkiaWVVrhnatt4ezFFY=
+    config::Config::set_option("custom-rendezvous-server".into(), "192.168.0.28".into());
+    config::Config::set_option("key".into(), "vcUVyDqvO2JU5RkPZIIBMr9LgkiaWVVrhnatt4ezFFY=".into());
     // core_main's load_custom_client does not work for flutter since it is only applied to its load_library in main.c
     if custom_client_config.is_empty() {
         crate::load_custom_client();

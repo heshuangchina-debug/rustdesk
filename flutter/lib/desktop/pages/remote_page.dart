@@ -86,6 +86,8 @@ class _RemotePageState extends State<RemotePage>
   late RxBool _remoteCursorMoved;
   late RxBool _keyboardEnabled;
   final _uniqueKey = UniqueKey();
+  // Privacy screen state - enabled by default via stateModel
+  bool _privacyScreenEnabled = false;
 
   var _blockableOverlayState = BlockableOverlayState();
 
@@ -190,6 +192,9 @@ class _RemotePageState extends State<RemotePage>
     if (_ffi.ffiModel.pi.isSet.value) {
       unawaited(_normalizeWaylandKeyboardModeIfNeeded());
     }
+
+    // Initialize privacy screen state from state model (default enabled)
+    _privacyScreenEnabled = stateGlobal.privacyScreenEnabled;
   }
 
   Future<void> _normalizeWaylandKeyboardModeIfNeeded() async {
@@ -401,6 +406,79 @@ class _RemotePageState extends State<RemotePage>
         ),
       );
 
+  /// Build the privacy screen overlay UI
+  Widget _buildPrivacyScreen() {
+    return Container(
+      color: Colors.black,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // First line: green dot + "yhlovnc隐私保护中"
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                SizedBox(width: 10),
+                Text(
+                  'yhlovnc隐私保护中',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 30),
+            // Second line: "正在远程工作中，请勿操作。" (larger font)
+            Text(
+              '正在远程工作中，请勿操作。',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 20),
+            // Third line: "按ctrl+p退出隐私保护"
+            Text(
+              '按ctrl+p退出隐私保护',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Handle privacy screen toggle on Ctrl+P
+  void _togglePrivacyScreen() {
+    setState(() {
+      if (_privacyScreenEnabled) {
+        // Exit privacy screen and enter lock screen (view only mode)
+        _privacyScreenEnabled = false;
+        // Set view only mode when exiting privacy screen
+        _ffi.ffiModel.setViewOnly(widget.id, true);
+      } else {
+        // Enter privacy screen
+        _privacyScreenEnabled = true;
+        // Disable view only mode when entering privacy screen
+        _ffi.ffiModel.setViewOnly(widget.id, false);
+      }
+    });
+  }
+
   Widget buildBody(BuildContext context) {
     remoteToolbar(BuildContext context) => RemoteToolbar(
           id: widget.id,
@@ -489,32 +567,46 @@ class _RemotePageState extends State<RemotePage>
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.background,
-      body: Obx(() {
-        final imageReady = _ffi.ffiModel.pi.isSet.isTrue &&
-            _ffi.ffiModel.waitForFirstImage.isFalse;
-        if (imageReady) {
-          // If the privacy mode(disable physical displays) is switched,
-          // we should not dismiss the dialog immediately.
-          if (DateTime.now().difference(togglePrivacyModeTime) >
-              const Duration(milliseconds: 3000)) {
-            // `dismissAll()` is to ensure that the state is clean.
-            // It's ok to call dismissAll() here.
-            _ffi.dialogManager.dismissAll();
-            // Recreate the block state to refresh the state.
-            _blockableOverlayState = BlockableOverlayState();
-            _blockableOverlayState.applyFfi(_ffi);
+      body: KeyboardListener(
+        focusNode: FocusNode(),
+        autofocus: true,
+        onKeyEvent: (event) {
+          // Handle Ctrl+P to toggle privacy screen
+          if (event is KeyDownEvent &&
+              event.logicalKey == LogicalKeyboardKey.keyP &&
+              HardwareKeyboard.instance.isControlPressed) {
+            _togglePrivacyScreen();
           }
-          // Block the whole `bodyWidget()` when dialog shows.
-          return BlockableOverlay(
-            underlying: bodyWidget(),
-            state: _blockableOverlayState,
-          );
-        } else {
-          // `_blockableOverlayState` is not recreated here.
-          // The toolbar's block state won't work properly when reconnecting, but that's okay.
-          return bodyWidget();
-        }
-      }),
+        },
+        child: Obx(() {
+          final imageReady = _ffi.ffiModel.pi.isSet.isTrue &&
+              _ffi.ffiModel.waitForFirstImage.isFalse;
+          if (imageReady) {
+            // If the privacy mode(disable physical displays) is switched,
+            // we should not dismiss the dialog immediately.
+            if (DateTime.now().difference(togglePrivacyModeTime) >
+                const Duration(milliseconds: 3000)) {
+              // `dismissAll()` is to ensure that the state is clean.
+              // It's ok to call dismissAll() here.
+              _ffi.dialogManager.dismissAll();
+              // Recreate the block state to refresh the state.
+              _blockableOverlayState = BlockableOverlayState();
+              _blockableOverlayState.applyFfi(_ffi);
+            }
+            // Show privacy screen when enabled, otherwise show normal body
+            return _privacyScreenEnabled
+                ? _buildPrivacyScreen()
+                : BlockableOverlay(
+                    underlying: bodyWidget(),
+                    state: _blockableOverlayState,
+                  );
+          } else {
+            // `_blockableOverlayState` is not recreated here.
+            // The toolbar's block state won't work properly when reconnecting, but that's okay.
+            return bodyWidget();
+          }
+        }),
+      ),
     );
   }
 
@@ -671,6 +763,18 @@ class _RemotePageState extends State<RemotePage>
         right: 10,
         child: _buildRawTouchAndPointerRegion(
             QualityMonitor(_ffi.qualityMonitorModel), null, null),
+      ),
+    );
+    // Add remote peer floating widget in the top-right corner
+    paints.add(
+      Positioned(
+        top: 60,
+        right: 10,
+        child: _RemotePeerFloatingWidget(
+          ffi: _ffi,
+          peerId: widget.id,
+          onDisconnect: () => clientClose(sessionId, _ffi),
+        ),
       ),
     );
     return Stack(
@@ -1035,6 +1139,153 @@ class _ImagePaintState extends State<ImagePaint> {
     } else {
       return child;
     }
+  }
+}
+
+/// A floating widget that displays current remote session information.
+/// Shown in the top-right corner of the remote page.
+class _RemotePeerFloatingWidget extends StatefulWidget {
+  final FFI ffi;
+  final String peerId;
+  final VoidCallback onDisconnect;
+
+  const _RemotePeerFloatingWidget({
+    Key? key,
+    required this.ffi,
+    required this.peerId,
+    required this.onDisconnect,
+  }) : super(key: key);
+
+  @override
+  State<_RemotePeerFloatingWidget> createState() => _RemotePeerFloatingWidgetState();
+}
+
+class _RemotePeerFloatingWidgetState extends State<_RemotePeerFloatingWidget> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Obx(() {
+        final pi = widget.ffi.ffiModel.pi;
+        final isSet = pi.isSet.isTrue;
+
+        if (!isSet) {
+          return const SizedBox.shrink();
+        }
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.6),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.white24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Collapsed view - session count and expand button
+              InkWell(
+                onTap: () => setState(() => _isExpanded = !_isExpanded),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.desktop_windows,
+                        color: Colors.white70,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '1 ${translate("Session")}',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        _isExpanded ? Icons.expand_less : Icons.expand_more,
+                        color: Colors.white70,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Expanded view - peer details
+              if (_isExpanded)
+                Container(
+                  constraints: const BoxConstraints(maxWidth: 200),
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Divider(color: Colors.white24, height: 16),
+                      // Username
+                      _buildInfoRow(
+                        Icons.person_outline,
+                        pi.username.isNotEmpty ? pi.username : translate('Unknown'),
+                      ),
+                      const SizedBox(height: 8),
+                      // Peer ID
+                      _buildInfoRow(
+                        Icons.tag,
+                        widget.peerId,
+                      ),
+                      const SizedBox(height: 8),
+                      // Hostname / IP
+                      _buildInfoRow(
+                        Icons.computer,
+                        pi.hostname.isNotEmpty ? pi.hostname : translate('Unknown'),
+                      ),
+                      const SizedBox(height: 16),
+                      // Disconnect button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            widget.onDisconnect();
+                          },
+                          icon: const Icon(Icons.link_off, size: 16),
+                          label: Text(translate('Disconnect')),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white54, size: 16),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
   }
 }
 

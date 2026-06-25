@@ -581,27 +581,27 @@ List<TTextMenu> toolbarControls(BuildContext context, String id, FFI ffi) {
       onPressed: () => sessionRefreshVideo(sessionId, pi),
     ));
   }
-  // record
-  if (!(isDesktop || isWeb) &&
-      (ffi.recordingModel.start || (perms["recording"] != false))) {
-    v.add(TTextMenu(
-        child: Row(
-          children: [
-            Text(translate(ffi.recordingModel.start
-                ? 'Stop session recording'
-                : 'Start session recording')),
-            Padding(
-              padding: EdgeInsets.only(left: 12),
-              child: Icon(
-                  ffi.recordingModel.start
-                      ? Icons.pause_circle_filled
-                      : Icons.videocam_outlined,
-                  color: MyTheme.accent),
-            )
-          ],
-        ),
-        onPressed: () => ffi.recordingModel.toggle()));
-  }
+  // record - hidden/disable by default
+  // if (!(isDesktop || isWeb) &&
+  //     (ffi.recordingModel.start || (perms["recording"] != false))) {
+  //   v.add(TTextMenu(
+  //       child: Row(
+  //         children: [
+  //           Text(translate(ffi.recordingModel.start
+  //               ? 'Stop session recording'
+  //               : 'Start session recording')),
+  //           Padding(
+  //             padding: EdgeInsets.only(left: 12),
+  //             child: Icon(
+  //                 ffi.recordingModel.start
+  //                     ? Icons.pause_circle_filled
+  //                     : Icons.videocam_outlined,
+  //                 color: MyTheme.accent),
+  //           )
+  //         ],
+  //       ),
+  //       onPressed: () => ffi.recordingModel.toggle()));
+  // }
 
   // to-do:
   // 1. Web desktop

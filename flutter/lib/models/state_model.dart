@@ -37,6 +37,9 @@ class StateGlobal {
   // Use for desktop -> remote toolbar -> resolution
   final Map<String, Map<int, String?>> _lastResolutionGroupValues = {};
 
+  // Privacy screen - enabled by default for remote sessions
+  bool privacyScreenEnabled = true;
+
   int get windowId => _windowId;
   RxBool get fullscreen => _fullscreen;
   bool get isMinimized => _isMinimized;

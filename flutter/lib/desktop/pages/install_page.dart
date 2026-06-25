@@ -184,23 +184,24 @@ class _InstallPageBodyState extends State<_InstallPageBody>
                         children: [
                           Text(translate('agreement_tip'))
                               .marginOnly(bottom: em),
-                          InkWell(
-                            hoverColor: Colors.transparent,
-                            onTap: () => launchUrlString(
-                                'https://rustdesk.com/privacy.html'),
-                            child: Tooltip(
-                              message: 'https://rustdesk.com/privacy.html',
-                              child: Row(children: [
-                                Icon(Icons.launch_outlined, size: 16)
-                                    .marginOnly(right: 5),
-                                Text(
-                                  translate('End-user license agreement'),
-                                  style: const TextStyle(
-                                      decoration: TextDecoration.underline),
-                                )
-                              ]),
-                            ),
-                          ),
+                          // User agreement hyperlink removed
+                          // InkWell(
+                          //   hoverColor: Colors.transparent,
+                          //   onTap: () => launchUrlString(
+                          //       'https://www.szyhlo.com/privacy.html'),
+                          //   child: Tooltip(
+                          //     message: 'https://www.szyhlo.com/privacy.html',
+                          //     child: Row(children: [
+                          //       Icon(Icons.launch_outlined, size: 16)
+                          //           .marginOnly(right: 5),
+                          //       Text(
+                          //         translate('End-user license agreement'),
+                          //         style: const TextStyle(
+                          //             decoration: TextDecoration.underline),
+                          //       )
+                          //     ]),
+                          //   ),
+                          // ),
                         ],
                       )
                     ],
