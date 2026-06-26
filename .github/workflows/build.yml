@@ -9,7 +9,6 @@ on:
         default: '1.4.8'
 
 env:
-  VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
   RUST_VERSION: "1.75"
   FLUTTER_VERSION: "3.24.5"
   LLVM_VERSION: "15.0.6"
@@ -39,21 +38,21 @@ jobs:
           Remove-Item llvm.exe
         shell: pwsh
 
-      - name: Setup vcpkg with GitHub Actions binary cache
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgDirectory: C:\vcpkg
-          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
-          doNotCache: false
-
-      - name: Install vcpkg dependencies
-        env:
-          VCPKG_DEFAULT_HOST_TRIPLET: x64-windows-static
+      - name: Setup vcpkg
         run: |
-          if not exist "%VCPKG_ROOT%\installed\x64-windows-static" (
-            "%VCPKG_ROOT%\vcpkg" install --triplet x64-windows-static
+          if not exist "C:\vcpkg\vcpkg.exe" (
+            git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
+            git -C C:\vcpkg checkout 120deac3062162151622ca4860575a33844ba10b
+            C:\vcpkg\bootstrap-vcpkg.bat
           )
         shell: cmd
+
+      - name: Install vcpkg dependencies
+        run: |
+          C:\vcpkg\vcpkg.exe install --triplet x64-windows-static
+        shell: cmd
+        env:
+          VCPKG_BINARY_SOURCES: clear
 
       - name: Build
         run: |
@@ -61,7 +60,6 @@ jobs:
         shell: cmd
         env:
           VCPKG_ROOT: C:\vcpkg
-          VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
 
       - name: Generate Installer
         run: |
@@ -92,7 +90,7 @@ jobs:
           sudo apt-get install -y \
             libx11-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-x11-dev \
             libgl1-mesa-dev libasound2-dev libpulse-dev libxdo-dev \
-            libayatana-appindicator3-dev ninja-build clang cmake libz-mingw-w64
+            libayatana-appindicator3-dev ninja-build clang cmake
 
       - name: Setup Flutter
         uses: flutter-actions/setup-flutter@v3
