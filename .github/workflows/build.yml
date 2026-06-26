@@ -26,11 +26,6 @@ jobs:
           channel: stable
           version: 3.24.5
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-
       - name: Install LLVM
         run: |
           Invoke-WebRequest -Uri https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.6/LLVM-15.0.6-win64.exe -OutFile llvm.exe
@@ -38,18 +33,13 @@ jobs:
           Remove-Item llvm.exe
         shell: pwsh
 
-      - name: Cache vcpkg
-        uses: actions/cache@v4
-        with:
-          path: C:\vcpkg
-          key: vcpkg-${{ hashFiles('vcpkg.json') }}
-
       - name: Setup vcpkg
-        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
         run: |
-          git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
-          git -C C:\vcpkg checkout 120deac3062162151622ca4860575a33844ba10b
-          C:\vcpkg\bootstrap-vcpkg.bat
+          if (-not (Test-Path "C:\vcpkg\vcpkg.exe")) {
+            git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
+            git -C C:\vcpkg checkout 120deac3062162151622ca4860575a33844ba10b
+            C:\vcpkg\bootstrap-vcpkg.bat
+          }
         shell: cmd
 
       - name: Build
@@ -61,14 +51,18 @@ jobs:
 
       - name: Generate Installer
         run: |
-          python libs\portable\generate.py -f flutter\build\windows\x64\runner\Release -o libs\portable -e flutter\build\windows\x64\runner\Release\YhloVnc.exe
+          if (Test-Path "flutter\build\windows\x64\runner\Release\YhloVnc.exe") {
+            python libs\portable\generate.py -f flutter\build\windows\x64\runner\Release -o libs\portable -e flutter\build\windows\x64\runner\Release\YhloVnc.exe
+          }
         shell: cmd
 
       - name: Upload artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: YhloVnc-${{ inputs.version }}-windows-x64
           path: |
+            target/release/*.exe
             target/release/yhlovnc-portable-packer.exe
             flutter/build/windows/x64/runner/Release/*.exe
           retention-days: 30
@@ -84,7 +78,7 @@ jobs:
           sudo apt-get install -y \
             libx11-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-x11-dev \
             libgl1-mesa-dev libasound2-dev libpulse-dev libxdo-dev \
-            libayatana-appindicator3-dev ninja-build clang cmake libz-mingw-w64
+            libayatana-appindicator3-dev ninja-build clang cmake
 
       - name: Setup Flutter
         uses: flutter-actions/setup-flutter@v3
@@ -99,16 +93,15 @@ jobs:
         run: |
           flutter config --enable-linux-desktop
           flutter build linux --release
-        shell: bash
 
-      - name: Create AppImage
+      - name: Create tarball
         run: |
           mkdir -p output
           cp -r flutter/build/linux/x64/release/bundle/* output/
           tar -czvf YhloVnc-${{ inputs.version }}-linux-x64.tar.gz -C output .
-        shell: bash
 
       - name: Upload Linux artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: YhloVnc-${{ inputs.version }}-linux-x64
@@ -129,25 +122,19 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@1.75
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-
       - name: Build macOS
         run: |
           flutter config --enable-macos-desktop
           flutter build macos --release
-        shell: bash
 
       - name: Create tarball
         run: |
           mkdir -p output
           cp -r flutter/build/macos/Build/Products/Release/rustdesk.app output/
           tar -czvf YhloVnc-${{ inputs.version }}-macos-x64.tar.gz -C output .
-        shell: bash
 
       - name: Upload macOS artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: YhloVnc-${{ inputs.version }}-macos-x64
